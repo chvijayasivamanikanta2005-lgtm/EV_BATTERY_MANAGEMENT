@@ -1,12 +1,5 @@
 """
 app.py — Explainable AI EV Battery Management Dashboard
-White Neumorphism (Soft UI) Theme
-
-Pipeline:
-    Sensor Inputs (IR, QC, QD, Tavg, Tmax, ChargeTime)
-    → GRU Raw SoH → Cycle Calibration → Health Status
-    → Auto RL State [SoH, Temp, Cycle, Current]
-    → Double DQN Decision → SHAP Explainability → Dashboard
 """
 
 import os
@@ -47,413 +40,372 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ── CSS ──────────────────────────────────────────────────────────────────────
+# ── CSS (Refined UI) ────────────────────────────────────────────────────────
 st.markdown(
-    '''
+    """
     <style>
     .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
     }
-    /* Style native st.container(border=True) to look like our cards */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: #ffffff !important;
-        border-radius: 16px !important;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08) !important;
+    
+    .dashboard-header {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+        margin-bottom: 30px;
+        text-align: center;
+        width: 100%;
+    }
+
+    .dashboard-title {
+        color: #111827;
+        font-weight: 700;
+        margin: 0 !important;
+        font-size: 1.8rem;
+        line-height: 1.2;
+    }
+    
+    .dashboard-subtitle {
+        color: #4b5563;
+        margin: 8px 0 0 0 !important;
+        font-size: 0.95rem;
+    }
+
+    /* ── Neumorphic Number Inputs (Global) ─────────────────── */
+    div[data-testid="stNumberInput"] {
+        margin-bottom: 18px;
+    }
+
+    div[data-testid="stNumberInput"] label {
+        font-family: 'Inter', sans-serif !important;
+        font-size: 0.78rem !important;
+        font-weight: 600 !important;
+        color: #475569 !important;
+        letter-spacing: 0.3px !important;
+        text-transform: uppercase !important;
+        margin-bottom: 8px !important;
+    }
+
+    /* Outer container — the pill shape */
+    div[data-testid="stNumberInput"] > div[data-testid="stNumberInput-StepperContainer"],
+    div[data-testid="stNumberInput"] > div:last-child {
+        background: #e0e5ec !important;
+        border-radius: 50px !important;
+        padding: 2px 8px !important;
+        box-shadow:
+            inset 6px 6px 12px #bec3c9,
+            inset -6px -6px 12px #ffffff !important;
+        transition: box-shadow 0.3s ease !important;
         border: none !important;
-        margin-bottom: 20px !important;
+        overflow: hidden !important;
     }
-    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12) !important;
+
+    div[data-testid="stNumberInput"] > div:last-child:hover {
+        box-shadow:
+            inset 8px 8px 16px #b5bac0,
+            inset -8px -8px 16px #ffffff !important;
+    }
+
+    /* Inner baseweb input container — fully transparent */
+    div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        border-color: transparent !important;
+        padding: 0 !important;
+    }
+
+    div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* The actual input element */
+    div[data-testid="stNumberInput"] input[type="number"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 10px 12px !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        color: #1e293b !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+
+    div[data-testid="stNumberInput"] input[type="number"]:focus {
+        outline: none !important;
+        box-shadow: none !important;
+        color: #111827 !important;
+    }
+
+    /* Style +/- buttons — blend into pill */
+    div[data-testid="stNumberInput"] button {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #94a3b8 !important;
+        padding: 4px 10px !important;
+    }
+
+    div[data-testid="stNumberInput"] button:hover {
+        color: #3b82f6 !important;
+        background: rgba(59, 130, 246, 0.06) !important;
+    }
+
+    /* ── Dashboard Card (for prediction panels) ────────────── */
+    .dashboard-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+        margin-bottom: 24px;
+        width: 100%;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════════════
+       RESPONSIVE MEDIA QUERIES
+    ══════════════════════════════════════════════════════════════════════════════ */
+    
+    html, body, [data-testid="stAppViewContainer"], .stApp {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    @media screen and (min-width: 1920px) {
+        .dashboard-header { padding: 35px; }
+        .dashboard-title { font-size: 2.2rem; }
+        div[data-testid="stNumberInput"] input[type="number"] { font-size: 16px !important; }
+    }
+
+    @media screen and (max-width: 1600px) {
+        .dashboard-title { font-size: 1.7rem; }
+    }
+
+    @media screen and (max-width: 1440px) {
+        .dashboard-header { padding: 20px; }
+        .dashboard-title { font-size: 1.6rem; }
+    }
+
+    @media screen and (max-width: 1280px) {
+        .dashboard-subtitle { font-size: 0.9rem; }
+    }
+
+    @media screen and (max-width: 1024px) {
+        .dashboard-title { font-size: 1.5rem; }
+        .dashboard-card { padding: 20px; }
+        div[data-testid="stNumberInput"] { margin-bottom: 14px; }
+    }
+
+    @media screen and (max-width: 900px) {
+        .dashboard-header { padding: 18px; }
+        .dashboard-title { font-size: 1.4rem; }
+    }
+
+    @media screen and (max-width: 768px) {
+        div[data-testid="column"] { 
+            width: 100% !important; 
+            flex: 1 1 100% !important; 
+            min-width: 100% !important;
+        }
+        .dashboard-title { font-size: 1.3rem; }
+        .dashboard-subtitle { font-size: 0.85rem; }
+        div[data-testid="stNumberInput"] label { font-size: 0.75rem !important; }
+        div[data-baseweb="tab-list"] { flex-wrap: wrap !important; gap: 8px; }
+        .js-plotly-plot, .plotly { width: 100% !important; }
+    }
+
+    @media screen and (max-width: 600px) {
+        .dashboard-header { padding: 15px; margin-bottom: 20px; }
+        .dashboard-card { padding: 15px; margin-bottom: 15px; }
+        .dashboard-title { font-size: 1.2rem; }
+        div[data-testid="stButton"] { display: flex; justify-content: center; }
+        div[data-testid="stButton"] button { width: 100%; padding: 12px !important; }
+        div[data-baseweb="slider"] { padding: 10px 0 !important; }
+    }
+
+    @media screen and (max-width: 480px) {
+        .dashboard-title { font-size: 1.1rem; }
+        .dashboard-subtitle { font-size: 0.8rem; }
+        div[data-testid="stNumberInput"] > div:last-child { padding: 1px 4px !important; }
+        div[data-testid="stNumberInput"] input[type="number"] { font-size: 14px !important; padding: 8px 10px !important; }
+    }
+
+    @media screen and (max-width: 360px) {
+        .dashboard-header { padding: 12px; }
+        .dashboard-title { font-size: 1rem; }
+        div[data-testid="stNumberInput"] label { font-size: 0.7rem !important; }
     }
     </style>
-    ''',
+    """,
     unsafe_allow_html=True
 )
-def _load_css(path):
-    with open(path) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-try:
-    _load_css(os.path.join("assets", "style.css"))
-except FileNotFoundError:
-    pass
-
-# ── Custom Streamlit Components ──────────────────────────────────────────────
-led_switch = components.declare_component("led_switch", path="assets/led_switch")
-neu_inputs_component = components.declare_component("neu_inputs", path="assets/neu_input")
 
 # ── Initialize Session State ─────────────────────────────────────────────────
+if "led_toggle" not in st.session_state:
+    st.session_state["led_toggle"] = True
+
 defaults = {
-    "ir": 0.04,
-    "qc": 1.5,
-    "qd": 1.5,
-    "tavg": 30.0,
-    "tmax": 35.0,
-    "chargetime": 5000,
+    "ir": 0.04, "qc": 1.5, "qd": 1.5,
+    "tavg": 30.0, "tmax": 35.0, "chargetime": 5000,
 }
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-if "show_inputs" not in st.session_state:
-    st.session_state.show_inputs = True
-
 # ══════════════════════════════════════════════════════════════════════════════
-#  HEADER — title + subtitle
+#  HEADER — Styled Header Card
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown(
     '''
-    <div style="text-align: center; margin-bottom: 20px;">
-        <h1 class="dashboard-title" style="margin-bottom: 5px;">⚡ Explainable AI EV Battery Management Dashboard</h1>
-        <p class="dashboard-subtitle" style="margin-top: 0; font-size: 0.9em; font-weight: 300; color: #64748b;">
-            AI-driven battery health prediction and charging optimisation<br>
-            GRU + Double DQN + SHAP
-        </p>
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">⚡ Explainable AI EV Battery Management Dashboard</h1>
+        <p class="dashboard-subtitle">AI-driven battery health prediction and charging optimisation | GRU + Double DQN + SHAP</p>
     </div>
     ''',
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
 
-# ── LED Toggle Switch (custom component) ─────────────────────────────────────
-led_res = led_switch(
-    checked=st.session_state.show_inputs,
+# ── Custom Streamlit Components ──────────────────────────────────────────────
+led_switch = components.declare_component("led_switch", path="assets/led_switch")
+
+# ── Sensor Inputs Section ────────────────────────────────────────────────────
+# Toggle switch (has built-in "🔧 Battery Sensor Inputs" label)
+led_switch(
+    checked=st.session_state.get("led_toggle", True),
     key="led_toggle",
-    default=st.session_state.show_inputs,
+    default=st.session_state.get("led_toggle", True),
 )
 
-if led_res is not None and bool(led_res) != st.session_state.show_inputs:
-    st.session_state.show_inputs = bool(led_res)
-    st.rerun()
+# ── Battery Sensor Inputs panel ──────────────────────────────────────────────
+if st.session_state.get("led_toggle", True):
+    input_container = st.container()
+    with input_container:
+        i_col1, i_col2, i_col3 = st.columns(3)
+        with i_col1:
+            st.session_state.ir = st.number_input("Internal Resistance (Ω)", value=0.04, step=0.001, format="%.4f", key="ir_input")
+            st.session_state.tavg = st.number_input("Average Temp (°C)", value=30.0, step=0.1, format="%.1f", key="tavg_input")
+        with i_col2:
+            st.session_state.qc = st.number_input("Charge Capacity (Ah)", value=1.5, step=0.1, format="%.2f", key="qc_input")
+            st.session_state.tmax = st.number_input("Maximum Temp (°C)", value=35.0, step=0.1, format="%.1f", key="tmax_input")
+        with i_col3:
+            st.session_state.qd = st.number_input("Discharge Capacity (Ah)", value=1.5, step=0.1, format="%.2f", key="qd_input")
+            st.session_state.chargetime = st.number_input("Charge Time (s)", value=5000, step=100, key="ct_input")
 
-# ── Battery Sensor Inputs panel (collapsible in main page) ───────────────────
-if st.session_state.show_inputs:
-    with st.container(border=True):
-        st.markdown(
-            '<div class="card-title" style="margin-bottom: 20px;">🔧 Battery Sensor Inputs</div>',
-            unsafe_allow_html=True,
-        )
-        input_defaults = {
-            "ir": st.session_state.ir,
-            "tavg": st.session_state.tavg,
-            "qc": st.session_state.qc,
-            "tmax": st.session_state.tmax,
-            "qd": st.session_state.qd,
-            "chargetime": st.session_state.chargetime,
-        }
-        input_vals = neu_inputs_component(
-            defaults=input_defaults, key="neu_battery_inputs", default=input_defaults
-        )
-        if input_vals is not None:
-            st.session_state.ir = float(input_vals.get("ir", st.session_state.ir))
-            st.session_state.tavg = float(input_vals.get("tavg", st.session_state.tavg))
-            st.session_state.qc = float(input_vals.get("qc", st.session_state.qc))
-            st.session_state.tmax = float(input_vals.get("tmax", st.session_state.tmax))
-            st.session_state.qd = float(input_vals.get("qd", st.session_state.qd))
-            st.session_state.chargetime = int(
-                float(input_vals.get("chargetime", st.session_state.chargetime))
-            )
+# ══════════════════════════════════════════════════════════════════════════════
+#  PREPARE UI PLACEHOLDER
+# ══════════════════════════════════════════════════════════════════════════════
+# This empty container is placed strictly after the inputs.
+# It ensures all Heavy ML charts render perfectly in sequence WITHOUT flashing intermediately.
+main_dashboard_container = st.container()
 
 # ── Load Models ──────────────────────────────────────────────────────────────
-with st.spinner("Loading ML models …"):
-    gru_model, dqn_model, scaler_X, scaler_y = load_models()
+# Models are cached via @st.cache_resource in inference.py
+gru_model, dqn_model, scaler_X, scaler_y = load_models()
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  INFERENCE PIPELINE (no UI — pure computation)
+#  INFERENCE PIPELINE
 # ══════════════════════════════════════════════════════════════════════════════
+# We separate inference from UI to allow caching to work effectively.
+# Caching ensures that toggling the visibility does NOT rerun expensive SHAP/Calculations.
 sequence = prepare_gru_sequence(
     scaler_X,
     st.session_state.ir, st.session_state.qc, st.session_state.qd,
     st.session_state.tavg, st.session_state.tmax, st.session_state.chargetime,
 )
-raw_soh = predict_soh(gru_model, scaler_y, sequence)
 
-est_cycle = estimate_cycle(st.session_state.qd, st.session_state.qc)
-est_current = estimate_current(st.session_state.qc, st.session_state.chargetime)
+# Only show the spinner during the actual computation, not the layout render.
+with st.spinner("Processing AI Insights..."):
+    raw_soh = predict_soh(_gru_model=gru_model, _scaler_y=scaler_y, sequence=sequence)
+    est_cycle = estimate_cycle(st.session_state.qd, st.session_state.qc)
+    est_current = estimate_current(st.session_state.qc, st.session_state.chargetime)
 
-cal_soh = calibrate_soh(raw_soh, est_cycle)
-health_label = get_battery_health_label(cal_soh)
+    cal_soh = calibrate_soh(raw_soh, est_cycle)
+    health_label = get_battery_health_label(cal_soh)
 
-rl_state = construct_rl_state(cal_soh, st.session_state.tavg, est_cycle, est_current)
-action, q_values = predict_rl_action(dqn_model, rl_state)
+    rl_state = construct_rl_state(cal_soh, st.session_state.tavg, est_cycle, est_current)
+    action, q_values = predict_rl_action(_dqn_model=dqn_model, state=rl_state)
 
-action_map = {0: "decrease", 1: "maintain", 2: "increase"}
-action_class = action_map.get(action, "maintain")
-action_text_map = {
-    0: "Decrease Charging",
-    1: "Maintain Charging",
-    2: "Increase Charging",
-}
-action_text = action_text_map.get(action, "Maintain Charging")
+    action_text_map = {0: "Increase Charging", 1: "Maintain", 2: "Decrease Charging"}
+    action_text = action_text_map.get(action, "Maintain")
 
-shap_values, chosen_action, _ = compute_shap_values(dqn_model, rl_state)
-gru_raw_inputs = [
-    st.session_state.ir, st.session_state.qc, st.session_state.qd,
-    st.session_state.tavg, st.session_state.tmax, st.session_state.chargetime,
-]
+    shap_values, chosen_action, _ = compute_shap_values(_dqn_model=dqn_model, state=rl_state)
+    gru_raw_inputs = [st.session_state.ir, st.session_state.qc, st.session_state.qd, st.session_state.tavg, st.session_state.tmax, st.session_state.chargetime]
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  PREDICTION PANELS — Battery Health | Charging Decision  (side-by-side)
+#  PREDICTION PANELS — Side-by-Side
 # ══════════════════════════════════════════════════════════════════════════════
-col_h, col_a = st.columns(2)
-
-with col_h:
-    with st.container(border=True):
-        st.markdown(
-            '<div class="card-title" style="margin-bottom: 20px;">🔋 Battery Health</div>',
-            unsafe_allow_html=True,
-        )
-
+with main_dashboard_container:
+    p_col1, p_col2 = st.columns(2)
+    
+    with p_col1:
+        st.markdown('<div style="font-size: 1rem; font-weight: 700; color: #111827; margin-bottom: 15px;">🔋 Battery Health Status</div>', unsafe_allow_html=True)
+        
         cal_pct = cal_soh * 100
-        raw_pct = raw_soh * 100
-
-        st.markdown(f'<div class="soh-value">{cal_pct:.1f}%</div>', unsafe_allow_html=True)
-        st.markdown(
-            '<div class="soh-label">Calibrated State-of-Health</div>', unsafe_allow_html=True
-        )
-
-        if cal_pct > 90:
-            badge_color = "#2ECC71"
-        elif cal_pct >= 70:
-            badge_color = "#F39C12"
-        else:
-            badge_color = "#E74C3C"
-
-        st.markdown(
-            f'<div style="text-align:center;margin:0.5rem 0">'
-            f'<span class="status-badge" style="background-color: {badge_color}; color: white;">'
-            f'Status: {health_label}</span></div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            '<div class="soh-metrics">'
-            f'<div class="soh-metric"><div class="metric-val">{raw_pct:.2f}%</div>'
-            f'<div class="metric-lbl">Raw SoH (GRU)</div></div>'
-            f'<div class="soh-metric"><div class="metric-val">{cal_pct:.2f}%</div>'
-            f'<div class="metric-lbl">Calibrated SoH</div></div>'
-            f'<div class="soh-metric"><div class="metric-val">{est_cycle}</div>'
-            f'<div class="metric-lbl">Est. Cycle</div></div>'
-            f'<div class="soh-metric"><div class="metric-val">{est_current:.2f}A</div>'
-            f'<div class="metric-lbl">Est. Current</div></div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        gauge_color = {
-            "Healthy": "#22c55e",
-            "Moderate": "#f59e0b",
-            "Degrading": "#fb923c",
-            "Severely Degraded": "#ef4444",
-        }.get(health_label, "#f59e0b")
-
+        st.markdown(f'<div style="font-size: 2.2rem; font-weight: 800; color: #111827; text-align: center;">{cal_pct:.1f}%</div>', unsafe_allow_html=True)
+        
+        gauge_color = {"Healthy": "#10b981", "Moderate": "#f59e0b", "Degrading": "#f97316", "Severely Degraded": "#ef4444"}.get(health_label, "#f59e0b")
         fig_g = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=cal_pct,
-            number={"suffix": "%", "font": {"color": "#1e293b", "size": 24}},
+            mode="gauge+number", value=cal_pct,
+            number={"suffix": "%", "font": {"size": 20}},
             gauge={
-                "axis": {
-                    "range": [0, 100], "tickcolor": "#94a3b8", "tickwidth": 1,
-                    "tickfont": {"color": "#64748b"},
-                },
-                "bar": {"color": gauge_color, "thickness": 0.3},
-                "bgcolor": "#e2e8f0",
-                "borderwidth": 0,
-                "steps": [
-                    {"range": [0, 70], "color": "rgba(239,68,68,0.08)"},
-                    {"range": [70, 80], "color": "rgba(251,146,60,0.08)"},
-                    {"range": [80, 90], "color": "rgba(245,158,11,0.08)"},
-                    {"range": [90, 100], "color": "rgba(34,197,94,0.08)"},
-                ],
-                "threshold": {
-                    "line": {"color": "#1e293b", "width": 2},
-                    "thickness": 0.8,
-                    "value": cal_pct,
-                },
-            },
+                "axis": {"range": [0, 100]},
+                "bar": {"color": gauge_color},
+                "steps": [{"range": [0, 70], "color": "#fee2e2"}, {"range": [70, 90], "color": "#fef3c7"}, {"range": [90, 100], "color": "#d1fae5"}],
+            }
         ))
-        fig_g.update_layout(
-            height=200,
-            margin=dict(l=20, r=20, t=40, b=20),
-            autosize=True,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#333333"),
-        )
-        st.plotly_chart(fig_g, use_container_width=True)
+        fig_g.update_layout(height=180, margin=dict(l=20, r=20, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_g, use_container_width=True, key="battery_health_gauge")
 
-with col_a:
-    with st.container(border=True):
-        st.markdown(
-            '<div class="card-title" style="margin-bottom: 20px;">⚡ Charging Decision (RL Policy)</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            f'<div style="text-align:center; font-weight:600; margin-bottom: 8px; color: #4A90E2;">'
-            f'Selected Action: {action_text}</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            '<div class="rl-pills">'
-            f'<div class="rl-pill">SoH: <strong>{cal_soh:.4f}</strong></div>'
-            f'<div class="rl-pill">Temp: <strong>{st.session_state.tavg:.1f} °C</strong></div>'
-            f'<div class="rl-pill">Cycle: <strong>{est_cycle}</strong></div>'
-            f'<div class="rl-pill">Current: <strong>{est_current:.2f} A</strong></div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        colors = ["#E74C3C", "#F39C12", "#2ECC71"]
-        opacities = [0.4, 0.4, 0.4]
-        line_widths = [0, 0, 0]
-        opacities[action] = 1.0
-        line_widths[action] = 2
-
+    with p_col2:
+        st.markdown('<div style="font-size: 1rem; font-weight: 700; color: #111827; margin-bottom: 15px;">⚡ AI Charging Decision</div>', unsafe_allow_html=True)
+        
+        st.markdown(f'<div style="text-align:center; font-weight:800; color: #2563eb; font-size: 1.2rem; margin-bottom: 20px;">{action_text}</div>', unsafe_allow_html=True)
+        
         fig_q = go.Figure(data=[go.Bar(
-            x=["Decrease", "Maintain", "Increase"],
-            y=q_values.tolist(),
-            marker=dict(
-                color=colors,
-                opacity=opacities,
-                line=dict(color="#333", width=line_widths),
-            ),
-            text=[f"{v:.4f}" for v in q_values],
-            textposition="outside",
-            textfont=dict(color="#333333", size=11),
+            x=["Increase", "Maintain", "Decrease"], y=q_values.tolist(),
+            marker_color=["#10b981", "#f59e0b", "#ef4444"]
         )])
-        fig_q.update_layout(
-            title=dict(text="Q-Values per Action", font=dict(color="#64748b", size=12)),
-            height=260,
-            margin=dict(l=20, r=20, t=40, b=20),
-            autosize=True,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#333333"),
-            yaxis=dict(gridcolor="#d1d5db", zerolinecolor="#d1d5db"),
-            xaxis=dict(gridcolor="#d1d5db"),
-            bargap=0.35,
-        )
-        st.plotly_chart(fig_q, use_container_width=True)
+        fig_q.update_layout(height=220, margin=dict(l=20, r=20, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_q, use_container_width=True, key="ai_decision_bar_chart")
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    #  EXPLAINABILITY — 3×3 Grid
+    # ══════════════════════════════════════════════════════════════════════════════
+    st.markdown('<div style="font-size: 1.1rem; font-weight: 700; color: #111827; margin-bottom: 5px;">📊 Model Explainability (SHAP)</div>', unsafe_allow_html=True)
+    st.markdown('<p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 20px;">Understanding feature impact on AI policy</p>', unsafe_allow_html=True)
+
+    shap_rows = [st.columns(3) for _ in range(3)]
+    plots = [
+        ("Global Importance", lambda: generate_feature_importance_plot(shap_values, chosen_action=chosen_action)),
+        ("Distribution", lambda: generate_shap_distribution_plot(shap_values, rl_state, chosen_action=chosen_action)),
+        ("Impact Map", lambda: generate_shap_heatmap(shap_values)),
+        ("Temp Dependency", lambda: generate_temperature_dependence(dqn_model, rl_state)),
+        ("Cycle Dependency", lambda: generate_cycle_dependence(dqn_model, rl_state)),
+        ("Current Dependency", lambda: generate_current_dependence(dqn_model, rl_state)),
+        ("Action Influence", lambda: generate_action_influence_plot(shap_values)),
+        ("Decision Ranking", lambda: generate_feature_ranking_plot(shap_values)),
+        ("Combined XAI", lambda: generate_combined_xai_plot(shap_values, rl_state, gru_raw_inputs, chosen_action))
+    ]
+
+    for i, (title, plot_func) in enumerate(plots):
+        with shap_rows[i//3][i%3]:
+            st.markdown(f'<p style="font-size: 0.8rem; font-weight: 600; color: #4b5563; margin-bottom: 5px;">{title}</p>', unsafe_allow_html=True)
+            try:
+                fig = plot_func()
+                st.pyplot(fig, use_container_width=True)
+            except: st.warning("Graph unavailable")
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    #  AI REASONING
+    # ══════════════════════════════════════════════════════════════════════════════
+    st.markdown('<div style="font-size: 1.1rem; font-weight: 700; color: #111827; margin-bottom: 15px; margin-top: 20px;">🤖 AI Reasoning Engine</div>', unsafe_allow_html=True)
+    reasoning = generate_reasoning_text(action, cal_soh, st.session_state.tavg, est_cycle, est_current)
+    st.markdown(f'<div style="background: #f9fafb; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; color: #374151; line-height: 1.6; font-size: 0.95rem;">{reasoning}</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  EXPLAINABILITY — 3×3 SHAP Grid
+#  FOOTER
 # ══════════════════════════════════════════════════════════════════════════════
-with st.container(border=True):
-    st.markdown(
-        '<div class="card-title">📊 Model Explainability (SHAP)</div>'
-        '<div style="font-size:0.85em;color:#64748b;margin-bottom:15px;">'
-        'Feature impact on AI model predictions</div>',
-        unsafe_allow_html=True,
-    )
-
-    # Row 1
-    r1c1, r1c2, r1c3 = st.columns(3)
-    with r1c1:
-        st.subheader("Global Feature Importance (GRU)")
-        try:
-            fig1 = generate_feature_importance_plot(shap_values, chosen_action=chosen_action)
-            st.pyplot(fig1, use_container_width=True)
-        except Exception as e:
-            st.warning(f"Plot unavailable: {e}")
-    with r1c2:
-        st.subheader("Feature Distribution")
-        try:
-            fig2 = generate_shap_distribution_plot(shap_values, rl_state, chosen_action=chosen_action)
-            st.pyplot(fig2, use_container_width=True)
-        except Exception as e:
-            st.warning("Distribution plot unavailable")
-    with r1c3:
-        st.subheader("SHAP Heatmap")
-        try:
-            fig3 = generate_shap_heatmap(shap_values)
-            st.pyplot(fig3, use_container_width=True)
-        except Exception as e:
-            st.warning("Heatmap unavailable")
-
-
-
-    # Row 2
-    r2c1, r2c2, r2c3 = st.columns(3)
-    with r2c1:
-        st.subheader("Temperature Influence")
-        try:
-            fig4 = generate_temperature_dependence(dqn_model, rl_state)
-            st.pyplot(fig4, use_container_width=True)
-        except Exception as e:
-            st.warning(f"Plot unavailable: {e}")
-    with r2c2:
-        st.subheader("Cycle Influence")
-        try:
-            fig5 = generate_cycle_dependence(dqn_model, rl_state)
-            st.pyplot(fig5, use_container_width=True)
-        except Exception as e:
-            st.warning("Plot unavailable")
-    with r2c3:
-        st.subheader("Current Influence")
-        try:
-            fig6 = generate_current_dependence(dqn_model, rl_state)
-            st.pyplot(fig6, use_container_width=True)
-        except Exception as e:
-            st.warning("Plot unavailable")
-
-
-    # Row 3
-    r3c1, r3c2, r3c3 = st.columns(3)
-    with r3c1:
-        st.subheader("RL Action Influence")
-        try:
-            fig7 = generate_action_influence_plot(shap_values)
-            st.pyplot(fig7, use_container_width=True)
-        except Exception as e:
-            st.warning(f"Plot unavailable: {e}")
-    with r3c2:
-        st.subheader("RL Decision SHAP Summary")
-        try:
-            fig8 = generate_feature_ranking_plot(shap_values)
-            st.pyplot(fig8, use_container_width=True)
-        except Exception as e:
-            st.warning("Plot unavailable")
-    with r3c3:
-        st.subheader("GRU vs RL Feature Ranking")
-        try:
-            fig9 = generate_combined_xai_plot(shap_values, rl_state, gru_raw_inputs, chosen_action)
-            st.pyplot(fig9, use_container_width=True)
-        except Exception as e:
-            st.warning("Plot unavailable")
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  AI REASONING
-# ══════════════════════════════════════════════════════════════════════════════
-with st.container(border=True):
-    st.markdown(
-        '<div class="card-title" style="margin-bottom: 20px;">🤖 AI Reasoning</div>',
-        unsafe_allow_html=True,
-    )
-
-    reasoning = generate_reasoning_text(
-        action, cal_soh, st.session_state.tavg, est_cycle, est_current
-    )
-    st.markdown(
-        f'''
-        <div class="reasoning-card">
-            <div style="font-weight: bold; margin-bottom: 8px; color: #4A90E2;">
-                Decision: {action_text}
-            </div>
-            {reasoning}
-        </div>
-        ''',
-        unsafe_allow_html=True,
-    )
-
-# ── Footer ───────────────────────────────────────────────────────────────────
-st.markdown(
-    '''
-    <div class="footer">
-        EV Battery AI System<br>
-        GRU SoH Prediction + Double DQN Charging Optimization<br>
-        Explainable AI powered by SHAP
-    </div>
-    ''',
-    unsafe_allow_html=True,
-)
+st.markdown('<div style="text-align: center; color: #9ca3af; font-size: 0.8rem; padding: 20px;">EV Battery AI Management • Explained by SHAP • GRU + Double DQN</div>', unsafe_allow_html=True)

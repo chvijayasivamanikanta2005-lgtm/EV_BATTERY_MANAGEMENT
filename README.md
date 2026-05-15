@@ -1,219 +1,240 @@
 ---
-title: EV Battery Management Dashboard
+title: Explainable AI EV Battery Management
 emoji: ⚡
 colorFrom: blue
 colorTo: indigo
 sdk: streamlit
 sdk_version: "1.32.0"
-python_version: "3.10"
+python_version: "3.11"
 app_file: app.py
 pinned: false
 ---
 
-# Explainable AI EV Battery Management System (EV-BMS)
+# ⚡ Explainable AI EV Battery Management System
 
-An Explainable AI powered Electric Vehicle Battery Management Dashboard that integrates deep learning, reinforcement learning, and explainable AI to optimise EV battery health and charging decisions.
-
-The system predicts Battery State-of-Health (SoH) using a GRU neural network and determines optimal charging actions using a Double Deep Q Network (Double DQN) while explaining the decisions using SHAP explainability.
+An **Explainable AI** powered Electric Vehicle Battery Management Dashboard integrating deep learning, reinforcement learning, and explainable AI to optimise EV battery health and charging decisions.
 
 ---
 
-# System Pipeline
+## 📋 Project Overview
 
-Battery Sensor Inputs → GRU SoH Prediction → SoH Calibration → RL State Generation → Double DQN Charging Decision → SHAP Explainability → Dashboard Visualization
-
----
-
-# Input Parameters
-
-The dashboard collects real battery sensor measurements:
-
-• IR — Internal Resistance  
-• QC — Charge Capacity  
-• QD — Discharge Capacity  
-• Tavg — Average Temperature  
-• Tmax — Maximum Temperature  
-• Charge Time — Charging duration
-
-These simulate real EV battery sensor data.
+This system predicts **Battery State-of-Health (SoH)** using a **GRU neural network**, determines optimal charging actions using a **Double Deep Q-Network (Double DQN)**, and explains every decision through **SHAP explainability** — all presented in a real-time Streamlit dashboard.
 
 ---
 
-# GRU Model – SoH Prediction
+## 🏗 System Architecture
 
-The GRU model predicts battery State-of-Health using the following features:
-
-IR  
-QC  
-QD  
-Tavg  
-Tmax  
-ChargeTime
-
-Input tensor shape:
-
-(1, 20, 6)
-
-Scaling files used:
-
-gru_scaler_X.pkl  
-gru_scaler_y.pkl
-
-Output:
-
-Predicted Battery State-of-Health (SoH)
-
----
-
-# SoH Calibration
-
-Battery degradation is estimated using cycle life.
-
-cycle = int((1 − QD / QC) × 800)
-
-degradation = 1 − (cycle / 800)
-
-Final calibrated SoH:
-
-SoH_final = Raw_SoH × (0.7 + 0.3 × degradation)
-
-Range constraint:
-
-0.5 ≤ SoH_final ≤ 1.0
-
----
-
-# Battery Health Classification
-
-SoH > 0.90 → Healthy  
-0.80 – 0.90 → Moderate  
-0.70 – 0.80 → Degrading  
-< 0.70 → Severely Degraded
-
----
-
-# Reinforcement Learning Controller
-
-The Double DQN controller determines optimal charging actions.
-
-RL State Vector:
-
-[SoH, Temp, Cycle, Current]
-
-Where:
-
-Temp = Tavg  
-Cycle = int((1 − QD / QC) × 800)  
-Current = QC / (ChargeTime / 3600)
-
----
-
-# Charging Actions
-
-The RL agent predicts three actions:
-
-Decrease Charging  
-Maintain Charging  
-Increase Charging
-
-The action with the highest Q-value is selected.
-
----
-
-# Explainable AI
-
-SHAP is used to interpret reinforcement learning decisions.
-
-Generated XAI visualisations include:
-
-Global Feature Importance  
-SHAP Distribution Plot  
-SHAP Heatmap  
-Temperature Dependence Plot  
-Cycle Influence Plot  
-Current Influence Plot  
-RL Action Influence Plot  
-Feature Ranking Plot  
-Combined GRU + RL Explanation
-
-These plots explain why the AI selected a particular charging strategy.
-
----
-
-# Dashboard Components
-
-Battery Health Panel  
-• Predicted SoH  
-• Battery health status  
-• Interactive gauge
-
-Charging Decision Panel  
-• RL charging recommendation  
-• Q-value comparison chart
-
-Explainability Panel  
-• SHAP visualisations explaining decisions
-
----
-
-# Technology Stack
-
-Streamlit  
-TensorFlow  
-NumPy  
-Pandas  
-Matplotlib  
-Plotly  
-SHAP  
-Scikit-Learn  
-Joblib
-
----
-
-# Project Structure
-
-```
-.
-├ app.py
-├ README.md
-├ requirements.txt
-│
-├ assets
-│   └ style.css
-│
-├ models
-│   ├ gru_soh_model.keras
-│   ├ double_dqn_calibrated.keras
-│   ├ gru_scaler_X.pkl
-│   └ gru_scaler_y.pkl
-│
-└ utils
-    ├ inference.py
-    └ xai.py
+```text
+Battery Sensor Inputs
+        │
+        ▼
+┌──────────────────┐
+│  GRU Neural Net  │ ──→ Raw SoH Prediction
+│  (20-step seq)   │
+└──────────────────┘
+        │
+        ▼
+┌──────────────────┐
+│  SoH Calibration │ ──→ Calibrated SoH (cycle-degradation adjusted)
+└──────────────────┘
+        │
+        ▼
+┌──────────────────┐
+│  Double DQN      │ ──→ Charging Action (Increase / Maintain / Decrease)
+│  RL Controller   │
+└──────────────────┘
+        │
+        ▼
+┌──────────────────┐
+│  SHAP            │ ──→ 9 Explainability Visualisations
+│  Explainability  │
+└──────────────────┘
+        │
+        ▼
+    Dashboard UI
 ```
 
 ---
 
-# Run Locally
+## 🧠 GRU Workflow
 
-Install dependencies:
+The GRU model takes 6 battery sensor features as input:
 
+| Feature | Description |
+|---------|-------------|
+| IR | Internal Resistance (Ω) |
+| QC | Charge Capacity (Ah) |
+| QD | Discharge Capacity (Ah) |
+| Tavg | Average Temperature (°C) |
+| Tmax | Maximum Temperature (°C) |
+| ChargeTime | Charging Duration (s) |
+
+- Input tensor shape: `(1, 20, 6)`
+- Output: Predicted Battery State-of-Health (SoH)
+- Scaling: `gru_scaler_X.pkl` (features), `gru_scaler_y.pkl` (target)
+
+---
+
+## 🎮 Double DQN Workflow
+
+The RL controller receives a 4-dimensional state vector:
+
+```text
+[SoH, Temperature, Cycle Count, Charging Current]
+```
+
+And selects one of three actions:
+- **Increase Charging** — Battery is healthy and cool
+- **Maintain Charging** — Parameters are optimal
+- **Decrease Charging** — Risk of degradation or thermal runaway
+
+---
+
+## 📊 SHAP Explainability
+
+9 XAI visualisations are generated:
+
+1. Global Feature Importance
+2. SHAP Distribution Plot
+3. SHAP Heatmap (All Actions)
+4. Temperature Dependence
+5. Cycle Dependence
+6. Current Dependence
+7. RL Action Influence
+8. Feature Ranking
+9. Combined GRU + RL Explanation
+
+---
+
+## 📸 Screenshots
+
+*Add screenshots here after deployment.*
+
+---
+
+## 📁 Project Structure
+
+```text
+EV_Battery_AI_System/
+├── .streamlit/
+│   └── config.toml
+├── assets/
+│   ├── components/
+│   │   ├── led_switch/
+│   │   └── new_input/
+│   ├── images/
+│   └── style.css
+├── models/
+│   ├── gru_soh_model.keras        (313 KB)
+│   ├── double_dqn_calibrated.keras ( 84 KB)
+│   ├── gru_scaler_X.pkl
+│   └── gru_scaler_y.pkl
+├── notebooks/
+│   ├── training.ipynb
+│   ├── evaluation.ipynb
+│   └── preprocessing.ipynb
+├── src/
+│   ├── __init__.py
+│   ├── core/
+│   │   ├── pipeline.py
+│   │   ├── preprocessing.py
+│   │   └── calibration.py
+│   ├── models_logic/
+│   │   ├── load_models.py
+│   │   ├── gru_logic.py
+│   │   └── rl_logic.py
+│   ├── explainability/
+│   │   └── shap_logic.py
+│   └── visualization/
+│       ├── charts.py
+│       └── gauges.py
+├── utils/
+│   ├── __init__.py
+│   ├── constants.py
+│   ├── helpers.py
+│   ├── validators.py
+│   └── styling.py
+├── app.py
+├── requirements.txt
+├── runtime.txt
+├── README.md
+├── LICENSE
+└── .gitignore
+```
+
+---
+
+## 🚀 Installation & Local Execution
+
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd EV_Battery_AI_System
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-Run dashboard:
-
+# 3. Run the dashboard
 streamlit run app.py
+```
 
 ---
 
-# Deployment
+## 🐳 Docker Deployment
 
-The application is deployed using Hugging Face Spaces with Streamlit.
+```bash
+docker build -t ev-bms-dashboard .
+docker run -p 8501:8501 ev-bms-dashboard
+```
 
 ---
 
-# Author
+## ☁️ Streamlit Cloud
 
-Vijay Manikanta  
-B.Tech – Artificial Intelligence & Machine Learning  
+Connect your GitHub repository to [Streamlit Cloud](https://streamlit.io/cloud). The `runtime.txt` specifies Python 3.11.
+
+---
+
+## 🤗 HuggingFace Spaces
+
+This repository is compatible with HuggingFace Spaces. The `README.md` front-matter configures the Space automatically. **No Git LFS required** — all model files are stored as standard git objects.
+
+---
+
+## 🔬 Model Details
+
+| Model | Architecture | File | Size |
+|-------|-------------|------|------|
+| SoH Predictor | GRU (64→32→1) | `gru_soh_model.keras` | 313 KB |
+| RL Controller | Double DQN (Dense) | `double_dqn_calibrated.keras` | 84 KB |
+| Feature Scaler | MinMaxScaler | `gru_scaler_X.pkl` | < 1 KB |
+| Target Scaler | MinMaxScaler | `gru_scaler_y.pkl` | < 1 KB |
+
+---
+
+## ✨ Features
+
+- Real-time SoH prediction with interactive gauge
+- AI-powered charging decision with Q-value visualisation
+- 9 SHAP explainability charts
+- Natural language AI reasoning
+- Responsive white-neumorphism design
+- Cross-platform portable (macOS / Windows / Linux)
+
+---
+
+## 🔮 Future Improvements
+
+- Multi-cell battery pack support
+- Real-time sensor data integration via MQTT/WebSocket
+- Historical trend analysis and degradation forecasting
+- Edge deployment optimisation (TFLite / ONNX)
+- User authentication and fleet management
+
+---
+
+## 👤 Author
+
+**Vijay Manikanta**
+*B.Tech — Artificial Intelligence & Machine Learning*
 Research Area: Explainable AI for Electric Vehicle Battery Management

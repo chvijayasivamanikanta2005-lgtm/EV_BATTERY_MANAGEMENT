@@ -1,6 +1,10 @@
 __pycache__/
 *.pyc
+*.pyo
+.DS_Store
+tmp/
+venv/
+.venv/
+env/
+.env
 *.log
-tmp*
-fix_*
-test_*

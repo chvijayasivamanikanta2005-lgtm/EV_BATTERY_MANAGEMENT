@@ -5,16 +5,17 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-COPY app.py ./
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+COPY .streamlit/ ./.streamlit/
+COPY src/ ./src/
 COPY utils/ ./utils/
 COPY assets/ ./assets/
 COPY models/ ./models/
-
-RUN pip3 install -r requirements.txt
+COPY app.py ./
 
 EXPOSE 8501
 

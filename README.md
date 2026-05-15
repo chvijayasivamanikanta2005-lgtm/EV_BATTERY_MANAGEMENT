@@ -233,8 +233,3 @@ This repository is compatible with HuggingFace Spaces. The `README.md` front-mat
 
 ---
 
-## 👤 Author
-
-**Vijay Manikanta**
-*B.Tech — Artificial Intelligence & Machine Learning*
-Research Area: Explainable AI for Electric Vehicle Battery Management

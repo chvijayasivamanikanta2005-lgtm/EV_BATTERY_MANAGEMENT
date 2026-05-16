@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ev-battery-dashboard
+    runtime: docker
+    repo: https://github.com/chvijayasivamanikanta2005/EV_BATTERY_MANAGEMENT
+    branch: main
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: STREAMLIT_SERVER_HEADLESS
+        value: "true"
+      - key: STREAMLIT_BROWSER_GATHER_USAGE_STATS
+        value: "false"

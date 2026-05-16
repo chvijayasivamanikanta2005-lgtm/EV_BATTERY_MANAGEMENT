@@ -17,8 +17,10 @@ COPY assets/ ./assets/
 COPY models/ ./models/
 COPY app.py ./
 
-EXPOSE 8501
+# Render injects PORT env var; default to 10000 (Render's default)
+ENV PORT=10000
+EXPOSE $PORT
 
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
+HEALTHCHECK CMD curl --fail http://localhost:${PORT}/_stcore/health
 
-ENTRYPOINT ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
